@@ -1,42 +1,31 @@
 import streamlit as st
 import os
 import re
-import json
-from datetime import datetime
 from dotenv import load_dotenv
 from anthropic import Anthropic, AnthropicError
-from agents.retrieval_new import retrieve_errors, extract_error_phrase
+import json
+from datetime import datetime
+from agents.retrieval_new import retrieve_errors, extract_error_phrase  # CHANGED: Import from retrieval_new.py
 from agents.log_raiser import raise_log
 
-# ========================================
-# 1. LOAD ENV & INITIALIZE DATABASE SAFELY
-# ========================================
+# Load environment variables
 load_dotenv()
 ANTHROPIC_API_KEY = os.getenv("ANTHROPIC_API_KEY")
 if not ANTHROPIC_API_KEY:
-    st.error("Anthropic API key not found. Please check Streamlit Secrets.")
-    st.stop()
-
-# Auto-create database on first run (safe)
-try:
-    import setup_db  # This creates errors.db if missing
-except Exception as e:
-    st.error(f"Failed to initialize database: {e}")
+    st.error("Anthropic API key not found. Please add it in **Streamlit Cloud → Settings → Secrets**.")
     st.stop()
 
 # Initialize Anthropic client
 client = Anthropic(api_key=ANTHROPIC_API_KEY)
 
-# ========================================
-# 2. LOAD COMPANY DATA (with fallback)
-# ========================================
+# Load company data from company.json
 def load_company_data():
     company_path = os.path.join(os.path.dirname(__file__), "data", "company.json")
     try:
-        with open(company_path, 'r', encoding='utf-8') as f:
+        with open(company_path, 'r') as f:
             return json.load(f)
-    except Exception as e:
-        st.warning(f"Using default company data: {e}")
+    except (FileNotFoundError, json.JSONDecodeError) as e:
+        st.error(f"Error loading company.json: {str(e)}. Using default data.")
         return [
             {"companyID": 490518, "ProfitCenterID": 3410, "companyname": "ZA10-ZA10-KTSA", "ProfitCenterName": "3410-CAPETOWN"},
             {"companyID": 490518, "ProfitCenterID": 3400, "companyname": "ZA10-ZA10-KTSA", "ProfitCenterName": "3400-JO BURG"}
@@ -44,9 +33,7 @@ def load_company_data():
 
 company_data = load_company_data()
 
-# ========================================
-# 3. TOOL & PROMPT (unchanged)
-# ========================================
+# Tool definitions
 tools = [
     {
         "name": "retrieve_errors",
@@ -63,6 +50,7 @@ tools = [
     }
 ]
 
+# Updated system prompt (minor tweak to emphasize knowledge-based suggestions for low-score matches)
 SYSTEM_PROMPT = """
 You are an SAP Error Handling Assistant, designed to assist users with SAP-related issues efficiently. You have comprehensive knowledge of SAP systems, including tables, processes, and common issues, and can act as an SAP consultant.
 
@@ -103,9 +91,7 @@ You are an SAP Error Handling Assistant, designed to assist users with SAP-relat
 - Go through the steps again from beginning when you sense a new input.
 """
 
-# ========================================
-# 4. SESSION STATE & UI
-# ========================================
+# Initialize session state
 if "messages" not in st.session_state:
     st.session_state.messages = []
 if "pending_details" not in st.session_state:
@@ -115,36 +101,52 @@ if "last_matches" not in st.session_state:
 if "last_user_error" not in st.session_state:
     st.session_state.last_user_error = None
 
-st.title("Tolaram SAP Assistant")
+st.title("SAP Assistant")
 
-# Display chat history
+# Display conversation history
 for message in st.session_state.messages:
     with st.chat_message(message["role"]):
-        st.markdown(message["content"], unsafe_allow_html=True)
+        st.markdown(message["content"])
 
-# ========================================
-# 5. CHAT INPUT & LOGIC
-# ========================================
-if prompt := st.chat_input("Type your SAP error or question..."):
+# Chat input and form handling
+if prompt := st.chat_input("Type your SAP error or message"):
+    # Add user message to history
     st.session_state.messages.append({"role": "user", "content": prompt})
     with st.chat_message("user"):
         st.markdown(prompt)
-
-    # Escalation intent detection
+    
+    # Check for user-requested escalation (broad intent detection)
     if re.search(r'\b(yes|yeah|ok|sure|please|raise|escalate|log|ticket)\b.*\b(raise|escalate|log|ticket|yes|yeah)\b', prompt.lower()):
+        print("Debug: Escalation intent detected. Triggering form using stored matches or default.")
         with st.chat_message("assistant"):
-            user_input = st.session_state.last_user_error or prompt
-            extracted_phrase = extract_error_phrase(user_input)
-            matches = st.session_state.last_matches or [{
-                "id": None, "module": "Unknown", "issuename": "No match", "issuedescription": user_input,
-                "solution": "Sorry, no match found.", "solutiontype": "consult", "score": 0
-            }]
+            user_input_for_escalation = st.session_state.last_user_error if st.session_state.last_user_error else prompt
+            extracted_phrase = extract_error_phrase(user_input_for_escalation)
+            if st.session_state.last_matches:
+                matches = st.session_state.last_matches
+            else:
+                # Default match if no previous matches
+                matches = [{
+                    "id": None,
+                    "module": "Unknown",
+                    "issuename": "No matching error found",
+                    "issuedescription": user_input_for_escalation,
+                    "solution": "Sorry no match found, I'm still learning",
+                    "solutiontype": "consult",
+                    "logcategory": None,
+                    "logsubcategory": None,
+                    "notes": None,
+                    "score": 0
+                }]
             st.session_state.pending_details = {
-                "user_input": user_input, "matches": matches, "extracted_phrase": extracted_phrase
+                "user_input": user_input_for_escalation,
+                "matches": matches,
+                "extracted_phrase": extracted_phrase
             }
-            st.markdown("Okay, let's raise a log. Please provide your details below.")
-            st.session_state.messages.append({"role": "assistant", "content": "Okay, let's raise a log. Please provide your details below."})
+            st.markdown("Okay, let's get started with raising a log ticket for your issue. Could you please provide me with the details I'll need to escalate this?")
+            st.session_state.messages.append({"role": "assistant", "content": "Okay, let's get started with raising a log ticket for your issue. Could you please provide me with the details I'll need to escalate this?"})
     else:
+        # No escalation intent detected; proceed with API call
+        print("Debug: No escalation intent detected. Calling Anthropic API.")
         with st.chat_message("assistant"):
             try:
                 response = client.messages.create(
@@ -155,100 +157,138 @@ if prompt := st.chat_input("Type your SAP error or question..."):
                     messages=[{"role": "user", "content": prompt}],
                     tools=tools
                 )
+                # Log API response for debugging
+                print(f"Debug: Anthropic API response: {response}")
 
-                for block in response.content:
-                    if block.type == "tool_use" and block.name == "retrieve_errors":
-                        tool_input = block.input
-                        result = retrieve_errors(**tool_input)
+                for content_block in response.content:
+                    if content_block.type == "tool_use":
+                        tool_name = content_block.name
+                        tool_input = content_block.input
+                        print(f"Debug: Tool call: {tool_name} with input: {json.dumps(tool_input)}")
 
-                        if result and isinstance(result, list):
-                            result = sorted(result, key=lambda x: x["score"], reverse=True)
-                            st.session_state.last_matches = result
-                            st.session_state.last_user_error = tool_input["user_input"]
-                            top = result[0]
-
-                            if top.get("solutiontype", "").lower() in ["", "consult", "user guidance"]:
-                                suggestion = client.messages.create(
+                        if tool_name == "retrieve_errors":
+                            try:  # CHANGED: Wrapped for safety
+                                result = retrieve_errors(**tool_input)
+                                # Handle result as a list of matches
+                                if isinstance(result, list) and result:
+                                    result = sorted(result, key=lambda x: x["score"], reverse=True)
+                                    st.session_state.last_matches = result
+                                    st.session_state.last_user_error = tool_input["user_input"]
+                                    print(f"Debug: retrieve_errors result: {json.dumps(result, indent=2)}")
+                                    top_match = result[0]
+                                    if top_match.get("solutiontype", "").lower() in ["", "consult"]:  # CHANGED: Adjusted for new default
+                                        # CHANGED: Dynamic LLM call for flexible suggestions
+                                        print("Debug: Generating dynamic suggestion via LLM.")
+                                        suggestion_response = client.messages.create(
+                                            model="claude-3-haiku-20240307",
+                                            max_tokens=200,
+                                            temperature=0.7,
+                                            system="You are an SAP consultant with comprehensive knowledge of all SAP modules and processes. Provide 1-2 concise, practical suggestions to resolve or investigate the user's SAP-related issue, based on standard practices. Focus on transaction codes, checks, or steps. Do not mention databases, tools, or escalation.",
+                                            messages=[{"role": "user", "content": f"User query: {prompt}"}]
+                                        )
+                                        suggestion = suggestion_response.content[0].text if suggestion_response.content else "Check relevant transaction codes (e.g., ME23N for POs) or verify master data and authorizations."
+                                        response_text = (
+                                            f"Sorry, I couldn’t find a match for that issue in my database. " #can be updated to only show based on your knowlegde
+                                            f"Based on my SAP expertise, here are some suggestions: {suggestion} "
+                                            f"Would you like to escalate this issue?"
+                                        )
+                                        st.markdown(response_text)
+                                        st.session_state.messages.append({"role": "assistant", "content": response_text})
+                                    elif "escalation" in top_match.get("solutiontype", "").lower():
+                                        print("Debug: Escalation required in Solutiontype. Triggering form.")
+                                        extracted_phrase = extract_error_phrase(prompt)
+                                        st.session_state.pending_details = {
+                                            "user_input": prompt,
+                                            "matches": result,
+                                            "extracted_phrase": extracted_phrase
+                                        }
+                                        st.markdown(f"**Here's how to try resolving it first:**\n\n{top_match['solution']}\n\n**This issue still requires escalation.** I will need to raise a log for you. Please provide your contact number, email address, CC email (if any), company, and profit center.")
+                                        st.session_state.messages.append({"role": "assistant", "content": "This issue requires escalation. I will need to raise a log for you. Please provide your contact number, email address, CC email (if any), company, and profit center."})
+                                    else:
+                                        st.markdown(f"Looks like you're facing '{top_match['issuename']}'. Here's how to resolve it: {top_match['solution']}")
+                                        st.session_state.messages.append({"role": "assistant", "content": f"Looks like you're facing '{top_match['issuename']}'. Here's how to resolve it: **\n\n{top_match['solution']}"})
+                                else:
+                                    # CHANGED: Dynamic LLM call for flexible suggestions
+                                    print("Debug: No results - Generating dynamic suggestion via LLM.")
+                                    suggestion_response = client.messages.create(
+                                        model="claude-3-haiku-20240307",
+                                        max_tokens=200,
+                                        temperature=0.7,
+                                        system="You are an SAP consultant with comprehensive knowledge of all SAP modules and processes. Provide 1-2 concise, practical suggestions to resolve or investigate the user's SAP-related issue, based on standard practices. Focus on transaction codes, checks, or steps. Do not mention databases, tools, or escalation.",
+                                        messages=[{"role": "user", "content": f"User query: {prompt}"}]
+                                    )
+                                    suggestion = suggestion_response.content[0].text if suggestion_response.content else "Check relevant transaction codes (e.g., ME23N for POs) or verify master data and authorizations."
+                                    response_text = (
+                                        f"Sorry, I couldn’t find a match for that issue in my database. "
+                                        f"Based on my SAP expertise, here are some suggestions: {suggestion} "
+                                        f"Would you like to escalate this issue?"
+                                    )
+                                    st.markdown(response_text)
+                                    st.session_state.messages.append({"role": "assistant", "content": response_text})
+                                    st.session_state.last_matches = None
+                                    st.session_state.last_user_error = None
+                            except Exception as e:
+                                print(f"Debug: Error processing retrieve_errors: {str(e)}")
+                                # CHANGED: Dynamic LLM call for flexible suggestions in error case
+                                suggestion_response = client.messages.create(
                                     model="claude-3-haiku-20240307",
-                                    max_tokens=150,
+                                    max_tokens=200,
                                     temperature=0.7,
-                                    system="You are an SAP expert. Give 1-2 concise suggestions. No mention of DB or escalation.",
-                                    messages=[{"role": "user", "content": f"Issue: {prompt}"}]
-                                ).content[0].text
-
-                                text = f"Sorry, no match found in database.\n\n**Suggestion:** {suggestion}\n\nWould you like to escalate?"
-                                st.markdown(text)
-                                st.session_state.messages.append({"role": "assistant", "content": text})
-
-                            elif "escalation" in top.get("solutiontype", "").lower():
-                                st.session_state.pending_details = {
-                                    "user_input": prompt, "matches": result,
-                                    "extracted_phrase": extract_error_phrase(prompt)
-                                }
-                                st.markdown(f"**Try this first:**\n\n{top.get('solution', 'N/A')}\n\n**Still need help?** I'll raise a ticket.")
-                                st.session_state.messages.append({"role": "assistant", "content": "Still need help? I'll raise a ticket."})
-
-                            else:
-                                solution = top.get('solution') or top.get('stepbystep') or "No steps available."
-                                st.markdown(f"**Issue:** {top['issuename']}\n\n**Solution:**\n{solution}")
-                                st.session_state.messages.append({"role": "assistant", "content": f"**Issue:** {top['issuename']}\n\n**Solution:**\n{solution}"})
-                        else:
-                            suggestion = client.messages.create(
-                                model="claude-3-haiku-20240307",
-                                max_tokens=150,
-                                temperature=0.7,
-                                system="You are an SAP expert. Give 1-2 concise suggestions. No mention of DB or escalation.",
-                                messages=[{"role": "user", "content": f"Issue: {prompt}"}]
-                            ).content[0].text
-                            text = f"Sorry, no match found.\n\n**Suggestion:** {suggestion}\n\nEscalate?"
-                            st.markdown(text)
-                            st.session_state.messages.append({"role": "assistant", "content": text})
-
-                    elif block.type == "text":
-                        st.markdown(block.text)
-                        st.session_state.messages.append({"role": "assistant", "content": block.text})
+                                    system="You are an SAP consultant with comprehensive knowledge of all SAP modules and processes. Provide 1-2 concise, practical suggestions to resolve or investigate the user's SAP-related issue, based on standard practices. Focus on transaction codes, checks, or steps. Do not mention databases, tools, or escalation.",
+                                    messages=[{"role": "user", "content": f"User query: {prompt}"}]
+                                )
+                                suggestion = suggestion_response.content[0].text if suggestion_response.content else "Check relevant transaction codes (e.g., ME23N for POs) or verify master data and authorizations."
+                                response_text = (
+                                    f"Sorry, an error occurred while searching for a solution. "
+                                    f"Based on my SAP expertise, here are some suggestions: {suggestion} "
+                                    f"Would you like to escalate this issue?"
+                                )
+                                st.markdown(response_text)
+                                st.session_state.messages.append({"role": "assistant", "content": response_text})
+                    elif content_block.type == "text":
+                        st.markdown(content_block.text)
+                        st.session_state.messages.append({"role": "assistant", "content": content_block.text})
 
             except AnthropicError as e:
-                st.error(f"API Error: {e}")
-                st.session_state.messages.append({"role": "assistant", "content": f"Error: {e}"})
+                print(f"Debug: Anthropic API error: {str(e)}")
+                st.error(f"API Error: {str(e)}")
+                st.session_state.messages.append({"role": "assistant", "content": f"Error: {str(e)}"})
 
-# ========================================
-# 6. ESCALATION FORM
-# ========================================
+# Handle escalation form (always checked outside input loop)
 if st.session_state.pending_details:
-    with st.form("escalation_form"):
-        col1, col2 = st.columns(2)
-        with col1:
-            contact_no = st.text_input("Contact Number", placeholder="+234...")
-            mail_id = st.text_input("Email", placeholder="you@tolaram.com")
-        with col2:
-            cc_to = st.text_input("CC Email (optional)", placeholder="manager@tolaram.com")
-            company_code = st.selectbox("Company", options=[c["companyID"] for c in company_data],
-                                      format_func=lambda x: next(c["companyname"] for c in company_data if c["companyID"] == x))
-            profit_center = st.selectbox("Profit Center", options=[c["ProfitCenterID"] for c in company_data],
-                                        format_func=lambda x: next(c["ProfitCenterName"] for c in company_data if c["ProfitCenterID"] == x))
+    print("Debug: Pending details found. Displaying escalation form.")
+    with st.form(key="escalation_form"):
+        contact_no = st.text_input("Contact Number", key="contact_no")
+        mail_id = st.text_input("Email Address", key="mail_id")
+        cc_to = st.text_input("CC Email", key="cc_to")
+        company_code = st.selectbox("Company", options=[c["companyID"] for c in company_data], format_func=lambda x: next(c["companyname"] for c in company_data if c["companyID"] == x))
+        profit_center = st.selectbox("Profit Center", options=[c["ProfitCenterID"] for c in company_data], format_func=lambda x: next(c["ProfitCenterName"] for c in company_data if c["ProfitCenterID"] == x))
+        submit_button = st.form_submit_button(label="Submit Details")
 
-        if st.form_submit_button("Submit Ticket"):
-            if contact_no and mail_id and company_code and profit_center:
+        if submit_button:
+            if all([contact_no, mail_id, company_code, profit_center]):
+                print("Debug: Form submitted with all required fields.")
                 details = st.session_state.pending_details.copy()
                 details.update({
                     "contact_no": contact_no,
                     "mail_id": mail_id,
-                    "cc_to": cc_to or "",
+                    "cc_to": cc_to,
                     "company_code": str(company_code),
                     "profit_center": str(profit_center)
                 })
                 with st.chat_message("assistant"):
                     try:
                         result = raise_log(details)
-                        ticket = result['response'].get('issue_number')
-                        zhi = result['response'].get('zhi_id')
-                        st.success(f"Ticket Created! **#{ticket}** | zHI: `{zhi}`")
-                        st.session_state.messages.append({"role": "assistant", "content": f"Ticket #{ticket} created! zHI: {zhi}"})
+                        print(f"Debug: raise_log result (form): {json.dumps(result, indent=2)}")
+                        st.markdown(f"Your log has been created! Ticket Number: {result['response'].get('issue_number')}, zHI ID: {result['response'].get('zhi_id')}")
+                        st.session_state.messages.append({"role": "assistant", "content": f"Your log has been created! Ticket Number: {result['response'].get('issue_number')}, zHI ID: {result['response'].get('zhi_id')}"})
                         st.session_state.pending_details = None
                         st.session_state.last_matches = None
                         st.session_state.last_user_error = None
                     except Exception as e:
-                        st.error(f"Failed to raise ticket: {e}")
+                        print(f"Debug: Error in raise_log (form): {str(e)}")
+                        st.markdown(f"Error raising log: {str(e)}")
+                        st.session_state.messages.append({"role": "assistant", "content": f"Error raising log: {str(e)}"})
             else:
+                print("Debug: Form submission attempted but missing required fields.")
                 st.error("Please fill all required fields.")
