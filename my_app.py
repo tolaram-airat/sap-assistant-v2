@@ -18,6 +18,12 @@ if not ANTHROPIC_API_KEY:
 # Initialize Anthropic client
 client = Anthropic(api_key=ANTHROPIC_API_KEY)
 
+try:
+    import setup_db          # creates data/errors.db if it does not exist
+except Exception as e:
+    st.error(f"Failed to initialize database: {e}")
+    st.stop()
+
 # Load company data from company.json
 def load_company_data():
     company_path = os.path.join(os.path.dirname(__file__), "data", "company.json")
