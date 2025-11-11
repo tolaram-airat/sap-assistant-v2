@@ -19,7 +19,7 @@ if not ANTHROPIC_API_KEY:
 
 # Auto-create database on first run (safe)
 try:
-    import set_db  # This creates errors.db if missing
+    import setup_db  # This creates errors.db if missing
 except Exception as e:
     st.error(f"Failed to initialize database: {e}")
     st.stop()
