@@ -1,3 +1,4 @@
+# setup_db.py
 import sqlite3
 import json
 import os
@@ -30,7 +31,7 @@ else:
     )
     """)
 
-    # Create mappings table (only if you use it later)
+    # Create mappings table
     cursor.execute("""
     CREATE TABLE IF NOT EXISTS mappings (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -72,14 +73,11 @@ else:
             company_count = 0
             profit_center_count = 0
             for item in companies:
-                # Company
                 cursor.execute("""
                 INSERT INTO mappings (type, code, name, logcategory, logsubcategory)
                 VALUES (?, ?, ?, ?, ?)
                 """, ('company', str(item['companyID']), item['companyname'], 3421, 3422))
                 company_count += 1
-
-                # Profit Center
                 cursor.execute("""
                 INSERT INTO mappings (type, code, name, logcategory, logsubcategory)
                 VALUES (?, ?, ?, ?, ?)
