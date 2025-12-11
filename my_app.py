@@ -14,13 +14,14 @@ from agents.log_raiser import raise_log
 # ------------------------------------------------------------------
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 DATA_DIR = os.path.join(BASE_DIR, "data")
+ERROR_DATA_DIR = os.path.join(BASE_DIR, "sap-kb-app")
 DB_PATH = os.path.join(DATA_DIR, "errors.db")
-ERRORS_JSON = os.path.join(DATA_DIR, "errors.json")
+ERRORS_JSON = os.path.join(ERROR_DATA_DIR, "errors.json")
 COMPANY_JSON = os.path.join(DATA_DIR, "company.json")
 
 # Ensure data directory exists
 os.makedirs(DATA_DIR, exist_ok=True)
-
+os.makedirs(ERROR_DATA_DIR, exist_ok=True)
 # ------------------------------------------------------------------
 # 2. DATABASE INITIALISATION – **idempotent** (runs only once)
 # ------------------------------------------------------------------

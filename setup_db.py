@@ -4,8 +4,8 @@ import json
 import os
 
 # Ensure data directory exists
-os.makedirs("data", exist_ok=True)
-DB_PATH = "data/errors.db"
+os.makedirs("sap-kb-app", exist_ok=True)
+DB_PATH = "sap-kb-app/errors.db"
 
 # === ONLY CREATE DB IF IT DOESN'T EXIST ===
 if os.path.exists(DB_PATH):
