@@ -1,69 +1,66 @@
-"use client";
+'use client';
 
-import { useState } from "react";
-import { useRouter } from "next/navigation";
-import { toast } from "sonner";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
-import { Label } from "@/components/ui/label";
+import { authenticate } from '@/lib/auth-actions';
+import { useActionState } from 'react';
+import { useFormStatus } from 'react-dom';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
+import { AlertCircle } from 'lucide-react';
 
 export default function LoginPage() {
-    const [username, setUsername] = useState("");
-    const [password, setPassword] = useState("");
-    const router = useRouter();
-
-    const handleLogin = (e: React.FormEvent) => {
-        e.preventDefault();
-
-        // Mock Authentication
-        if (username === "consultant" && password === "sap123") {
-            toast.success("Login successful!");
-            router.push("/dashboard");
-        } else {
-            toast.error("Invalid credentials. Try consultant / sap123");
-        }
-    };
+    const [errorMessage, dispatch] = useActionState(authenticate, undefined);
 
     return (
-        <div className="flex min-h-screen w-full items-center justify-center bg-gradient-to-br from-red-900 via-red-950 to-black">
-            <Card className="w-[400px] shadow-2xl border-none">
-                <CardHeader className="text-center">
-                    <CardTitle className="text-3xl font-bold">SAP KB</CardTitle>
-                    <CardDescription>Error Knowledge Base Management</CardDescription>
+        <div className="flex items-center justify-center min-h-screen bg-slate-50 dark:bg-slate-900">
+            <Card className="w-full max-w-sm">
+                <CardHeader>
+                    <CardTitle className="text-2xl">Login</CardTitle>
+                    <CardDescription>
+                        Enter your credentials to access the SAP KB App.
+                    </CardDescription>
                 </CardHeader>
-                <CardContent>
-                    <form onSubmit={handleLogin} className="space-y-4">
-                        <div className="space-y-2">
-                            <Label htmlFor="username">Username</Label>
+                <form action={dispatch}>
+                    <CardContent className="grid gap-4">
+                        <div className="grid gap-2">
+                            <Label htmlFor="email">Email</Label>
                             <Input
-                                id="username"
-                                placeholder="consultant"
-                                value={username}
-                                onChange={(e) => setUsername(e.target.value)}
+                                id="email"
+                                type="email"
+                                name="email"
+                                placeholder="m@example.com"
                                 required
                             />
                         </div>
-                        <div className="space-y-2">
+                        <div className="grid gap-2">
                             <Label htmlFor="password">Password</Label>
-                            <Input
-                                id="password"
-                                type="password"
-                                placeholder="........"
-                                value={password}
-                                onChange={(e) => setPassword(e.target.value)}
-                                required
-                            />
+                            <Input id="password" type="password" name="password" required />
                         </div>
-                        <Button type="submit" className="w-full bg-black hover:bg-gray-800 text-white font-bold h-12">
-                            Login
-                        </Button>
-                    </form>
-                </CardContent>
-                <CardFooter className="flex justify-center">
-                    <p className="text-xs text-muted-foreground">Demo credentials: consultant / sap123</p>
-                </CardFooter>
+                        <div className="flex items-end space-x-1" aria-live="polite" aria-atomic="true">
+                            {errorMessage && (
+                                <>
+                                    <AlertCircle className="h-5 w-5 text-red-500" />
+                                    <p className="text-sm text-red-500">{errorMessage}</p>
+                                </>
+                            )}
+                        </div>
+                    </CardContent>
+                    <CardFooter>
+                        <LoginButton />
+                    </CardFooter>
+                </form>
             </Card>
         </div>
+    );
+}
+
+function LoginButton() {
+    const { pending } = useFormStatus();
+
+    return (
+        <Button className="w-full" aria-disabled={pending}>
+            {pending ? 'Logging in...' : 'Sign in'}
+        </Button>
     );
 }

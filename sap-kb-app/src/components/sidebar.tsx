@@ -5,6 +5,7 @@ import { usePathname } from "next/navigation";
 import { LayoutDashboard, PlusCircle, UploadCloud, CheckSquare, Eye, LogOut } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
+import { logout } from "@/lib/auth-actions";
 
 const menuItems = [
     {
@@ -68,12 +69,15 @@ export function Sidebar() {
             </div>
 
             <div className="p-4 border-t">
-                <Link href="/login">
-                    <Button variant="outline" className="w-full justify-start gap-3" size="lg">
-                        <LogOut className="h-4 w-4" />
-                        Logout
-                    </Button>
-                </Link>
+                <Button
+                    variant="outline"
+                    className="w-full justify-start gap-3"
+                    size="lg"
+                    onClick={() => logout()}
+                >
+                    <LogOut className="h-4 w-4" />
+                    Logout
+                </Button>
             </div>
         </div>
     );

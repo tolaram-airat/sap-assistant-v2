@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { savePendingError } from "@/lib/actions";
 import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -87,23 +88,28 @@ export default function BulkUploadPage() {
         if (input) input.value = '';
     };
 
-    const handleUpload = () => {
+    const handleUpload = async () => {
         if (parsedData.length === 0) return;
 
-        // Add ID and timestamps
-        const entries = parsedData.map(d => ({
-            id: crypto.randomUUID(),
-            ...d,
-            status: "pending",
-            createdAt: new Date().toISOString(),
-            comments: []
-        }));
+        try {
+            // Use Promise.all to save all in parallel
+            await Promise.all(parsedData.map(d =>
+                savePendingError({
+                    module: d.module,
+                    error_code: d.issuename,
+                    error_description: d.issuedescription,
+                    solution_type: d.solutiontype,
+                    steps_to_resolve: d.stepbystep,
+                    expert_comment: d.notes + `\n\n[Category: ${d.logcategory}, Sub: ${d.logsubcategory || 'None'}]`
+                })
+            ));
 
-        const existing = JSON.parse(localStorage.getItem("sap-kb-pending") || "[]");
-        localStorage.setItem("sap-kb-pending", JSON.stringify([...existing, ...entries]));
-
-        toast.success(`${entries.length} errors queued for approval.`);
-        router.push("/approval");
+            toast.success(`${parsedData.length} errors queued for approval.`);
+            router.push("/approval");
+        } catch (error) {
+            console.error(error);
+            toast.error("Failed to upload errors.");
+        }
     };
 
     return (

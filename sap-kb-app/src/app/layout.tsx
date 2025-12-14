@@ -17,6 +17,7 @@ export const metadata: Metadata = {
   description: "Authorized SAP consultants only.",
 };
 
+import { SessionProvider } from "@/components/session-provider";
 import { Toaster } from "@/components/ui/sonner";
 
 export default function RootLayout({
@@ -28,9 +29,12 @@ export default function RootLayout({
     <html lang="en">
       <body
         className={`${geistSans.variable} ${geistMono.variable} antialiased`}
+        suppressHydrationWarning
       >
-        {children}
-        <Toaster />
+        <SessionProvider>
+          {children}
+          <Toaster />
+        </SessionProvider>
       </body>
     </html>
   );

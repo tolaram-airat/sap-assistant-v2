@@ -13,19 +13,21 @@ import {
 } from "@/components/ui/accordion";
 import { Input } from "@/components/ui/input";
 import { toast } from "sonner";
-import { saveApprovedError } from "@/lib/actions";
+
+import { getPendingErrors, approveError, rejectError } from "@/lib/actions";
+import { auth } from "@/auth";
+import { useSession } from "next-auth/react";
 import { LOG_CATEGORIES, LOG_SUBCATEGORIES } from "@/lib/constants";
 import { CheckCircle, XCircle } from "lucide-react";
 
 export default function ApprovalPage() {
+    const { data: session } = useSession();
     const [pendingErrors, setPendingErrors] = useState<any[]>([]);
     const [commentInputs, setCommentInputs] = useState<Record<string, string>>({});
 
     useEffect(() => {
-        const data = localStorage.getItem("sap-kb-pending");
-        if (data) {
-            setPendingErrors(JSON.parse(data));
-        }
+        // Fetch pending errors from server
+        getPendingErrors().then(setPendingErrors);
     }, []);
 
     const getCategoryLabel = (id: number) => LOG_CATEGORIES.find((c) => c.id === id)?.label || id;
@@ -33,48 +35,50 @@ export default function ApprovalPage() {
         LOG_SUBCATEGORIES[catId]?.find((s) => s.id === subId)?.label || subId || "-";
 
     const handleApprove = async (error: any) => {
-        // 1. Convert to final JSON format (flatten status, etc is already fine)
-        const approvedEntry = {
-            ...error,
-            status: "approved",
-            approvedAt: new Date().toISOString(),
-        };
-
         try {
-            // 2. Save to file via Server Action
-            await saveApprovedError(approvedEntry);
-
-            // 3. Remove from pending
-            const newPending = pendingErrors.filter((e) => e.id !== error.id);
-            setPendingErrors(newPending);
-            localStorage.setItem("sap-kb-pending", JSON.stringify(newPending));
-
-            toast.success(`Error "${error.issuename}" approved successfully.`);
+            const userName = session?.user?.name || "Admin";
+            const result = await approveError(error.id, userName);
+            if (result.success) {
+                setPendingErrors(prev => prev.filter(e => e.id !== error.id));
+                toast.success(`Error "${error.error_code || error.issuename}" approved successfully.`);
+            } else {
+                toast.error("Failed to approve error.");
+            }
         } catch (err) {
             console.error(err);
-            toast.error("Failed to save error.");
+            toast.error("Failed to approve error.");
         }
     };
 
-    const handleDecline = (id: string) => {
-        const newPending = pendingErrors.filter((e) => e.id !== id);
-        setPendingErrors(newPending);
-        localStorage.setItem("sap-kb-pending", JSON.stringify(newPending));
-        toast.info("Error request declined.");
+    const handleDecline = async (id: number) => {
+        try {
+            const result = await rejectError(id);
+            if (result.success) {
+                setPendingErrors(prev => prev.filter(e => e.id !== id));
+                toast.info("Error request declined.");
+            } else {
+                toast.error("Failed to decline error.");
+            }
+        } catch (err) {
+            console.error(err);
+            toast.error("Failed to decline error.");
+        }
     };
 
     const handleApproveAll = async () => {
+        const userName = session?.user?.name || "Admin";
         for (const error of pendingErrors) {
-            await saveApprovedError({ ...error, status: "approved", approvedAt: new Date().toISOString() });
+            await approveError(error.id, userName);
         }
         setPendingErrors([]);
-        localStorage.setItem("sap-kb-pending", "[]");
         toast.success("All pending errors approved.");
     };
 
-    const handleDeclineAll = () => {
+    const handleDeclineAll = async () => {
+        for (const error of pendingErrors) {
+            await rejectError(error.id);
+        }
         setPendingErrors([]);
-        localStorage.setItem("sap-kb-pending", "[]");
         toast.info("All pending errors declined.");
     };
 

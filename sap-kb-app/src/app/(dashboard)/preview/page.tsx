@@ -21,9 +21,9 @@ export default function PreviewPage() {
         LOG_SUBCATEGORIES[catId]?.find((s) => s.id === subId)?.label || subId || "-";
 
     const filteredErrors = errors.filter((error) =>
-        error.issuename.toLowerCase().includes(search.toLowerCase()) ||
-        error.issuedescription.toLowerCase().includes(search.toLowerCase()) ||
-        error.module.toLowerCase().includes(search.toLowerCase())
+        (error.error_code || '').toLowerCase().includes(search.toLowerCase()) ||
+        (error.error_description || '').toLowerCase().includes(search.toLowerCase()) ||
+        (error.module || '').toLowerCase().includes(search.toLowerCase())
     );
 
     return (
@@ -57,8 +57,8 @@ export default function PreviewPage() {
                                     <TableHead>Issue Name</TableHead>
                                     <TableHead className="w-[300px]">Description</TableHead>
                                     <TableHead>Solution Type</TableHead>
-                                    <TableHead>Category</TableHead>
                                     <TableHead className="w-[300px]">Solution</TableHead>
+                                    <TableHead>Expert Comment</TableHead>
                                 </TableRow>
                             </TableHeader>
                             <TableBody>
@@ -72,16 +72,11 @@ export default function PreviewPage() {
                                     filteredErrors.map((error, index) => (
                                         <TableRow key={index}>
                                             <TableCell className="font-medium">{error.module}</TableCell>
-                                            <TableCell>{error.issuename}</TableCell>
-                                            <TableCell className="truncate max-w-[300px]" title={error.issuedescription}>{error.issuedescription}</TableCell>
-                                            <TableCell>{error.solutiontype}</TableCell>
-                                            <TableCell>
-                                                <div className="flex flex-col text-xs">
-                                                    <span>{getCategoryLabel(error.logcategory)}</span>
-                                                    <span className="text-muted-foreground">{error.logsubcategory ? getSubcategoryLabel(error.logcategory, error.logsubcategory) : ""}</span>
-                                                </div>
-                                            </TableCell>
-                                            <TableCell className="truncate max-w-[300px]" title={error.stepbystep}>{error.stepbystep}</TableCell>
+                                            <TableCell>{error.error_code}</TableCell>
+                                            <TableCell className="truncate max-w-[300px]" title={error.error_description}>{error.error_description}</TableCell>
+                                            <TableCell>{error.solution_type}</TableCell>
+                                            <TableCell className="truncate max-w-[300px]" title={error.steps_to_resolve}>{error.steps_to_resolve}</TableCell>
+                                            <TableCell className="truncate max-w-[200px]" title={error.expert_comment}>{error.expert_comment || '-'}</TableCell>
                                         </TableRow>
                                     ))
                                 )}

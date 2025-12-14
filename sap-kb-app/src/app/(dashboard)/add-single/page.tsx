@@ -1,6 +1,7 @@
 "use client";
 
 import { useForm } from "react-hook-form";
+import { savePendingError } from "@/lib/actions";
 import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
 import { toast } from "sonner";
@@ -62,25 +63,33 @@ export default function AddSingleErrorPage() {
         : [];
 
     const onSubmit = async (values: z.infer<typeof formSchema>) => {
-        console.log("Submitting:", values);
+        try {
+            // Map form fields to DB schema
+            const newEntry = {
+                module: values.module,
+                error_code: values.issuename, // Mapping "Issue Name" to error_code
+                error_description: values.issuedescription,
+                solution_type: values.solutiontype,
+                steps_to_resolve: values.stepbystep,
+                expert_comment: values.notes,
+                // Note: logcategory/subcategory not strictly in schema unless added to expert_comment or new columns
+                // For now putting them in expert_comment or ignoring if schema doesn't support them explicitly
+            };
 
-        // Mock API call / Store in local storage
-        const newEntry = {
-            id: crypto.randomUUID(),
-            ...values,
-            logcategory: parseInt(values.logcategory),
-            logsubcategory: values.logsubcategory ? parseInt(values.logsubcategory) : null,
-            status: "pending",
-            createdAt: new Date().toISOString(),
-            comments: []
-        };
+            // Append category info to description or notes if needed, or if schema was updated to support them.
+            // Based on types.ts, we don't have logcategory column. 
+            // We'll append to expert_comment for now to preserve data.
+            const extraInfo = `\n\n[Category: ${values.logcategory}, Sub: ${values.logsubcategory || 'None'}]`;
+            newEntry.expert_comment += extraInfo;
 
-        // Store in localStorage for demo
-        const existing = JSON.parse(localStorage.getItem("sap-kb-pending") || "[]");
-        localStorage.setItem("sap-kb-pending", JSON.stringify([...existing, newEntry]));
+            await savePendingError(newEntry);
 
-        toast.success("Error submitted for approval successfully!");
-        router.push("/approval");
+            toast.success("Error submitted for approval successfully!");
+            router.push("/approval");
+        } catch (error) {
+            console.error(error);
+            toast.error("Failed to submit error.");
+        }
     };
 
     return (
