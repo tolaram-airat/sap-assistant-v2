@@ -21,7 +21,7 @@ export const authConfig = {
         // Add role to the session
         async session({ session, token }) {
             if (token.role) {
-                session.user.role = token.role;
+                session.user.role = token.role as string;
             }
             return session;
         },
