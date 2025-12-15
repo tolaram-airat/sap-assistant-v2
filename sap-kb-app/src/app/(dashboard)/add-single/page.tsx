@@ -71,7 +71,7 @@ export default function AddSingleErrorPage() {
                 error_description: values.issuedescription,
                 solution_type: values.solutiontype,
                 steps_to_resolve: values.stepbystep,
-                expert_comment: values.notes,
+                expert_comment: values.notes || "",
                 // Note: logcategory/subcategory not strictly in schema unless added to expert_comment or new columns
                 // For now putting them in expert_comment or ignoring if schema doesn't support them explicitly
             };

@@ -39,7 +39,8 @@ async function main() {
 
     // 3. Seed Users
     const users = [
-      { email: 'airat.aroyewun@tolaram', name: 'Airat Aroyewun', role: 'ADMIN' }, // Entry + Approval
+      { email: 'airat.aroyewun@tolaram.com', name: 'Airat Aroyewun', role: 'ADMIN' }, // Entry + Approval
+      { email: 'aroyewun.airat@tolaram.com', name: 'Airat Aroyewun', role: 'ADMIN' }, // Alternate format
       { email: 'Sadhwika.Peri@tolaram.com', name: 'Sadhwika Peri', role: 'USER' }, // Entry only
       { email: 'Balaji.Mohandas@tolaram.com', name: 'Balaji Mohandas', role: 'USER' }, // Entry only
       { email: 'sreenivas@tolaram.com', name: 'Sreenivas', role: 'ADMIN' }, // Entry + Approval

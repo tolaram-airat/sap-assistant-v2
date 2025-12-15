@@ -55,7 +55,11 @@ export async function savePendingError(entry: Omit<KBError, 'id' | 'status'>) {
         return { success: true };
     } catch (error) {
         console.error("Failed to save error:", error);
-        throw new Error("Failed to save error to database");
+        if (error instanceof Error) {
+            throw new Error(`Failed to save error to database: ${error.message}`);
+        } else {
+            throw new Error("Failed to save error to database: Unknown error");
+        }
     }
 }
 

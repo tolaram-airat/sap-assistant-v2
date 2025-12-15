@@ -40,7 +40,7 @@ export default function ApprovalPage() {
             const result = await approveError(error.id, userName);
             if (result.success) {
                 setPendingErrors(prev => prev.filter(e => e.id !== error.id));
-                toast.success(`Error "${error.error_code || error.issuename}" approved successfully.`);
+                toast.success(`Error "${error.error_code}" approved successfully.`);
             } else {
                 toast.error("Failed to approve error.");
             }
@@ -115,12 +115,16 @@ export default function ApprovalPage() {
                     <p className="text-muted-foreground">Review and approve pending errors ({pendingErrors.length})</p>
                 </div>
                 <div className="flex gap-2">
-                    <Button variant="outline" className="text-red-600 border-red-200 hover:bg-red-50" onClick={handleDeclineAll} disabled={pendingErrors.length === 0}>
-                        Decline All
-                    </Button>
-                    <Button className="bg-green-600 hover:bg-green-700 text-white" onClick={handleApproveAll} disabled={pendingErrors.length === 0}>
-                        Approve All
-                    </Button>
+                    {session?.user?.role === 'ADMIN' && (
+                        <>
+                            <Button variant="outline" className="text-red-600 border-red-200 hover:bg-red-50" onClick={handleDeclineAll} disabled={pendingErrors.length === 0}>
+                                Decline All
+                            </Button>
+                            <Button className="bg-green-600 hover:bg-green-700 text-white" onClick={handleApproveAll} disabled={pendingErrors.length === 0}>
+                                Approve All
+                            </Button>
+                        </>
+                    )}
                 </div>
             </div>
 
@@ -137,34 +141,46 @@ export default function ApprovalPage() {
                         <Card key={error.id} className="overflow-hidden">
                             <CardHeader className="flex flex-row items-start justify-between bg-muted/30 pb-4">
                                 <div className="space-y-1">
-                                    <CardTitle className="text-xl">{error.issuename}</CardTitle>
+                                    <CardTitle className="text-xl">{error.error_code}</CardTitle>
                                     <CardDescription>
-                                        <span className="font-semibold text-primary">{error.module}</span> • {getCategoryLabel(error.logcategory)} {error.logsubcategory ? ` / ${getSubcategoryLabel(error.logcategory, error.logsubcategory)}` : ""}
+                                        <span className="font-semibold text-primary">{error.module}</span>
+                                        {/* Categories might need re-parsing if they are stored in comments/expert_comment now, but for now let's just display what we have or omit if using regex later */}
+                                        {/* For detailed category display we need to parse expert_comment or keep logcategory if it was migrated. 
+                                            Assuming DB migration didn't strictly migrate 'logcategory' column but put it in expert_comment. 
+                                            Let's simplify for now or assuming error object has properties if custom query used. 
+                                            Actually, checking types.ts, there is NO logcategory column. 
+                                            So we should remove the category display or parse it from expert_comment if strictly needed.
+                                            Let's remove category display to avoid errors for now, or display expert_comment.
+                                        */}
                                     </CardDescription>
                                 </div>
                                 <div className="flex items-center gap-2">
-                                    <Button size="sm" className="bg-green-600 hover:bg-green-700 text-white" onClick={() => handleApprove(error)}>
-                                        <CheckCircle className="mr-1 h-4 w-4" /> Approve
-                                    </Button>
-                                    <Button size="sm" variant="outline" className="text-red-600 border-red-200 hover:bg-red-50" onClick={() => handleDecline(error.id)}>
-                                        <XCircle className="mr-1 h-4 w-4" /> Decline
-                                    </Button>
+                                    {session?.user?.role === 'ADMIN' && (
+                                        <>
+                                            <Button size="sm" className="bg-green-600 hover:bg-green-700 text-white" onClick={() => handleApprove(error)}>
+                                                <CheckCircle className="mr-1 h-4 w-4" /> Approve
+                                            </Button>
+                                            <Button size="sm" variant="outline" className="text-red-600 border-red-200 hover:bg-red-50" onClick={() => handleDecline(error.id)}>
+                                                <XCircle className="mr-1 h-4 w-4" /> Decline
+                                            </Button>
+                                        </>
+                                    )}
                                 </div>
                             </CardHeader>
                             <CardContent className="pt-4 grid gap-4">
                                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                                     <div>
                                         <h4 className="text-sm font-semibold mb-1">Description</h4>
-                                        <p className="text-sm text-muted-foreground whitespace-pre-wrap">{error.issuedescription}</p>
+                                        <p className="text-sm text-muted-foreground whitespace-pre-wrap">{error.error_description}</p>
                                     </div>
                                     <div>
-                                        <h4 className="text-sm font-semibold mb-1">Solution ({error.solutiontype})</h4>
-                                        <p className="text-sm text-muted-foreground whitespace-pre-wrap">{error.stepbystep}</p>
+                                        <h4 className="text-sm font-semibold mb-1">Solution ({error.solution_type})</h4>
+                                        <p className="text-sm text-muted-foreground whitespace-pre-wrap">{error.steps_to_resolve}</p>
                                     </div>
                                 </div>
 
                                 <div className="text-xs text-muted-foreground pt-2">
-                                    <strong>Notes:</strong> {error.notes || "None"}
+                                    <strong>Expert Comment:</strong> {error.expert_comment || "None"}
                                 </div>
 
                                 <Accordion type="single" collapsible>

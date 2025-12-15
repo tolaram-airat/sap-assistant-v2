@@ -32,7 +32,8 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
 
                 if (parsedCredentials.success) {
                     const { email, password } = parsedCredentials.data;
-                    const user = await getUser(email);
+                    const lowerEmail = email.toLowerCase();
+                    const user = await getUser(lowerEmail);
 
                     if (!user) return null;
 
@@ -43,7 +44,7 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
                     // (Assuming user object has password field which my 'User' type hides, but 'select *' returns it)
 
                     // Let's do it properly by fetching password too.
-                    const userWithPassword = (await db.sql`SELECT * FROM users WHERE email=${email}`).rows[0];
+                    const userWithPassword = (await db.sql`SELECT * FROM users WHERE email=${lowerEmail}`).rows[0];
                     const passwordsMatch = await bcrypt.compare(password, userWithPassword.password);
 
                     if (passwordsMatch) {
