@@ -1,0 +1,152 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<style>
+    body { font-family: 'Segoe UI', Arial, sans-serif; line-height: 1.6; max-width: 800px; margin: 0 auto; padding: 20px; }
+    h1 { color: #2D3748; border-bottom: 2px solid #CBD5E0; padding-bottom: 10px; margin-top: 0; }
+    h2 { color: #4A5568; border-bottom: 1px solid #E2E8F0; padding-bottom: 5px; margin-top: 30px; }
+    h3 { color: #718096; margin-top: 20px; }
+    ul { margin-bottom: 20px; }
+    li { margin-bottom: 5px; }
+    code { background-color: #F7FAFC; padding: 2px 5px; border-radius: 3px; font-family: Consolas, monospace; }
+    pre { background-color: #F7FAFC; padding: 15px; border-radius: 5px; overflow-x: auto; border: 1px solid #E2E8F0; }
+    img { max-width: 100%; height: auto; border: 1px solid #E2E8F0; border-radius: 5px; margin: 20px 0; box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1); }
+    table { width: 100%; border-collapse: collapse; margin: 20px 0; }
+    th, td { border: 1px solid #E2E8F0; padding: 10px; text-align: left; }
+    th { background-color: #F7FAFC; }
+</style>
+</head>
+<body>
+
+<h1>SAP AI Agent - Technical Documentation & SOP</h1>
+
+<h2>1. Overview</h2>
+<p>This document outlines the technical approach, architecture, and standard operating procedures (SOP) for the <strong>SAP AI Agent (v1.0)</strong>. The system is designed to streamline SAP error resolution by providing a searchable knowledge base, a structured submission process for new errors, and an approval workflow to ensure data quality.</p>
+
+<h2>2. System Architecture</h2>
+
+<h3>Core Technologies</h3>
+<ul>
+    <li><strong>Framework</strong>: <a href="https://nextjs.org/">Next.js 15</a> (React Framework)</li>
+    <li><strong>Language</strong>: TypeScript</li>
+    <li><strong>Database</strong>: Vercel Postgres (Cloud SQL)</li>
+    <li><strong>Authentication</strong>: NextAuth.js (v5)</li>
+    <li><strong>Styling</strong>: Tailwind CSS / Shadcn UI</li>
+    <li><strong>File Processing</strong>: <code>xlsx</code> (SheetJS) for Excel parsing, <code>papaparse</code> for CSV.</li>
+</ul>
+
+<h3>Database Schema</h3>
+<p>The system uses two primary tables in a PostgreSQL database:</p>
+
+<ol>
+    <li>
+        <strong><code>users</code></strong>: Stores authorized personnel.
+        <ul>
+            <li><code>email</code> (Unique ID)</li>
+            <li><code>password</code> (Bcrypt Hashed)</li>
+            <li><code>role</code> ('ADMIN' or 'USER')</li>
+            <li><code>name</code></li>
+        </ul>
+    </li>
+    <li>
+        <strong><code>kb_errors</code></strong>: Stores the knowledge base entries.
+        <ul>
+            <li><code>error_code</code>: The unique SAP error identifier (e.g., "M7001").</li>
+            <li><code>error_description</code>: Detailed description.</li>
+            <li><code>module</code>: SAP Module (MM, SD, FICO, etc.).</li>
+            <li><code>solution_type</code>: Categorization of the fix (User Guidance, Config, etc.).</li>
+            <li><code>steps_to_resolve</code>: Step-by-step resolution guide.</li>
+            <li><code>expert_comment</code>: Internal notes and tags.</li>
+            <li><code>status</code>: 'PENDING' (Newly submitted), 'APPROVED' (Live in search).</li>
+        </ul>
+    </li>
+</ol>
+
+<hr>
+
+<h2>3. Workflows & Implementation Details</h2>
+
+<h3>A. Authentication & Security</h3>
+<p>Access is restricted to authorized users only. Non-authenticated users are redirected to the login page.</p>
+<ul>
+    <li><strong>Admin Role</strong>: Full access (Dashboard, Search, Add, Bulk Upload, Approval Queue, Export).</li>
+    <li><strong>User Role</strong>: Limited access (Search, Add, Bulk Upload).</li>
+</ul>
+
+<img src="file:///C:/Users/airat.aroyewun/.gemini/antigravity/brain/bd36b966-6897-4aae-ad56-e46a3dfac4ab/login_page_1765881633150.png" alt="Login Page">
+
+<h3>B. Dashboard & Search</h3>
+<p>The main dashboard provides a real-time overview of the system status, including the count of pending approvals.</p>
+<ul>
+    <li><strong>Implementation</strong>: Server-side data fetching ensures instant load times and up-to-date counts.</li>
+    <li><strong>Export</strong>: Admins can download the entire approved database as a JSON file.</li>
+</ul>
+
+<img src="file:///C:/Users/airat.aroyewun/.gemini/antigravity/brain/bd36b966-6897-4aae-ad56-e46a3dfac4ab/dashboard_page_1765881683254.png" alt="Dashboard">
+
+<h3>C. Adding Solutions (Single Entry)</h3>
+<p>Consultants can document single errors quickly using a standardized form.</p>
+<ul>
+    <li><strong>Features</strong>: Dropdowns for Modules and Solution Types enforce data consistency.</li>
+    <li><strong>Validation</strong>: Required fields are checked before submission.</li>
+</ul>
+
+<img src="file:///C:/Users/airat.aroyewun/.gemini/antigravity/brain/bd36b966-6897-4aae-ad56-e46a3dfac4ab/add_single_page_1765881731292.png" alt="Add Single Error">
+
+<h3>D. Bulk Upload (Excel/CSV)</h3>
+<p>For mass updates, users can upload spreadsheets.</p>
+<ul>
+    <li><strong>Excel Support</strong>: Native <code>.xlsx</code> parsing.</li>
+    <li><strong>Smart Mapping</strong>: The system automatically maps headers like "Issue Name", "issue_name", or "issuename" to the correct database fields, reducing format errors.</li>
+</ul>
+
+<img src="file:///C:/Users/airat.aroyewun/.gemini/antigravity/brain/bd36b966-6897-4aae-ad56-e46a3dfac4ab/bulk_upload_page_1765881755781.png" alt="Bulk Upload">
+
+<h3>E. Approval Queue (Quality Assurance)</h3>
+<p>To prevent "garbage in, garbage out," all submissions go to a holding area.</p>
+<ul>
+    <li><strong>Process</strong>: Admins review "PENDING" entries.</li>
+    <li><strong>Actions</strong>: 
+        <ul>
+            <li><strong>Approve</strong>: Moves entry to production (searchable).</li>
+            <li><strong>Decline</strong>: Permanently deletes the entry from the database.</li>
+        </ul>
+    </li>
+    <li><strong>Security</strong>: Approval buttons are strictly visible only to users with the 'ADMIN' role.</li>
+</ul>
+
+<img src="file:///C:/Users/airat.aroyewun/.gemini/antigravity/brain/bd36b966-6897-4aae-ad56-e46a3dfac4ab/approval_page_1765881699953.png" alt="Approval Queue">
+
+<hr>
+
+<h2>4. Maintenance SOP</h2>
+
+<h3>Adding New Users</h3>
+<p>Currently, user management is handled via database scripts for security.</p>
+<ol>
+    <li>Open <code>scripts/setup_db.js</code>.</li>
+    <li>Add the new user to the <code>users</code> array:
+        <pre><code>{ email: 'new.user@tolaram.com', name: 'New User', role: 'USER' }</code></pre>
+    </li>
+    <li>Run the script: <code>node scripts/setup_db.js</code>.</li>
+</ol>
+
+<h3>Updating the Database Schema</h3>
+<p>If new fields are needed (e.g., "legacy_id"):</p>
+<ol>
+    <li>Update the <code>CREATE TABLE</code> query in <code>scripts/setup_db.js</code>.</li>
+    <li>Update <code>src/lib/types.ts</code> to reflect the new interface.</li>
+    <li>Update <code>src/lib/actions.ts</code> to handle the new field in <code>INSERT</code>/<code>SELECT</code> queries.</li>
+</ol>
+
+<h3>Deployment Updates</h3>
+<p>The application is connected to GitHub.</p>
+<ol>
+    <li>Commit changes locally: <code>git commit -m "update details"</code>.</li>
+    <li>Push to main: <code>git push</code>.</li>
+    <li>Vercel will automatically detect the commit and redeploy the site.</li>
+</ol>
+
+</body>
+</html>
