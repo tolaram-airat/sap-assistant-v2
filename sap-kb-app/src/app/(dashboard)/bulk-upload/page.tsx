@@ -10,6 +10,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { toast } from "sonner";
 import { UploadCloud, FileSpreadsheet, Trash2 } from "lucide-react";
 import Papa from "papaparse";
+import * as XLSX from "xlsx";
 
 const MOCK_PARSED_DATA = Array.from({ length: 5 }).map((_, i) => ({
     module: "MM",
@@ -33,51 +34,82 @@ export default function BulkUploadPage() {
             setFile(selectedFile);
             setParsedData([]); // Reset
 
-            const toastId = toast.loading("Parsing CSV file...");
+            const toastId = toast.loading("Parsing file...");
 
-            Papa.parse(selectedFile, {
-                header: true,
-                skipEmptyLines: true,
-                complete: (results) => {
-                    // Filter out non-fatal errors like delimiter guessing issues if data exists
-                    const meaningfulErrors = results.errors.filter(
-                        (err) => err.code !== "UndetectableDelimiter" && err.code !== "TooFewFields"
-                    );
-
-                    if (meaningfulErrors.length > 0 && results.data.length === 0) {
-                        console.error("CSV Parse Errors:", results.errors);
-                        toast.error(`Error parsing file: ${meaningfulErrors[0].message}`);
-                        toast.dismiss(toastId);
-                        return;
-                    }
-
-                    if (results.data.length === 0) {
-                        toast.error("File appears to be empty.");
-                        toast.dismiss(toastId);
-                        return;
-                    }
-
-                    // Map CSV columns to our schema
-                    const validData = results.data.map((row: any) => ({
-                        module: row.module || "N/A",
-                        issuename: row.issuename || row.issueName || "Untitled Issue",
-                        issuedescription: row.issuedescription || row.issueDescription || "No description",
-                        solutiontype: row.solutiontype || row.solutionType || "User Guidance",
-                        stepbystep: row.stepbystep || row.stepByStep || "No steps provided",
-                        logcategory: parseInt(row.logcategory || row.logCategory) || 2703, // Default if missing
-                        logsubcategory: parseInt(row.logsubcategory || row.logSubcategory) || null,
-                        notes: row.notes || ""
-                    }));
-
-                    setParsedData(validData);
+            const processData = (data: any[]) => {
+                if (data.length === 0) {
+                    toast.error("File appears to be empty.");
                     toast.dismiss(toastId);
-                    toast.success(`Successfully parsed ${validData.length} entries.`);
-                },
-                error: (error) => {
-                    toast.dismiss(toastId);
-                    toast.error(`Failed to parse file: ${error.message}`);
+                    return;
                 }
-            });
+
+                // Helper to normalize keys (lowercase, remove spaces)
+                const normalizeKey = (key: string) => key.toLowerCase().replace(/[^a-z0-9]/g, "");
+
+                const validData = data.map((row: any) => {
+                    const normalizedRow: any = {};
+                    Object.keys(row).forEach(key => {
+                        normalizedRow[normalizeKey(key)] = row[key];
+                    });
+
+                    return {
+                        module: normalizedRow.module || "N/A",
+                        issuename: normalizedRow.issuename || normalizedRow.errorcode || "Untitled Issue",
+                        issuedescription: normalizedRow.issuedescription || normalizedRow.errordescription || "No description",
+                        solutiontype: normalizedRow.solutiontype || "User Guidance",
+                        stepbystep: normalizedRow.stepbystep || normalizedRow.stepstoresolve || "No steps provided",
+                        logcategory: parseInt(normalizedRow.logcategory) || 2703,
+                        logsubcategory: parseInt(normalizedRow.logsubcategory) || null,
+                        notes: normalizedRow.notes || normalizedRow.expertcomment || ""
+                    };
+                });
+
+                setParsedData(validData);
+                toast.dismiss(toastId);
+                toast.success(`Successfully parsed ${validData.length} entries.`);
+            };
+
+            const fileExtension = selectedFile.name.split('.').pop()?.toLowerCase();
+
+            if (fileExtension === 'csv') {
+                Papa.parse(selectedFile, {
+                    header: true,
+                    skipEmptyLines: true,
+                    complete: (results) => {
+                        const meaningfulErrors = results.errors.filter(
+                            (err) => err.code !== "UndetectableDelimiter" && err.code !== "TooFewFields"
+                        );
+                        if (meaningfulErrors.length > 0 && results.data.length === 0) {
+                            toast.error(`Error parsing file: ${meaningfulErrors[0].message}`);
+                            toast.dismiss(toastId);
+                            return;
+                        }
+                        processData(results.data);
+                    },
+                    error: (error) => {
+                        toast.dismiss(toastId);
+                        toast.error(`Failed to parse CSV: ${error.message}`);
+                    }
+                });
+            } else {
+                // Handle Excel (.xlsx, .xls)
+                const reader = new FileReader();
+                reader.onload = (e) => {
+                    try {
+                        const data = e.target?.result;
+                        const workbook = XLSX.read(data, { type: 'binary' });
+                        const sheetName = workbook.SheetNames[0];
+                        const sheet = workbook.Sheets[sheetName];
+                        const jsonData = XLSX.utils.sheet_to_json(sheet);
+                        processData(jsonData);
+                    } catch (error) {
+                        toast.dismiss(toastId);
+                        toast.error("Failed to parse Excel file.");
+                        console.error(error);
+                    }
+                };
+                reader.readAsBinaryString(selectedFile);
+            }
         }
     };
 

@@ -45,19 +45,21 @@ async function main() {
       { email: 'Balaji.Mohandas@tolaram.com', name: 'Balaji Mohandas', role: 'USER' }, // Entry only
       { email: 'sreenivas@tolaram.com', name: 'Sreenivas', role: 'ADMIN' }, // Entry + Approval
       { email: 'benedicta.olorungbade@tolaram.com', name: 'Benedicta Olorungbade', role: 'ADMIN' }, // Entry + Approval
+      { email: 'Sureshkumar.Mahadevu@tolaram.com', name: 'Sureshkumar Mahadevu', role: 'ADMIN' }, // Entry + Approval
     ];
 
     for (const user of users) {
       // Default password for everyone (should be changed later) -> "password123"
       const hashedPassword = await bcrypt.hash('password123', 10);
 
+      const normalizedEmail = user.email.toLowerCase();
       await client.sql`
         INSERT INTO users (email, password, role, name)
-        VALUES (${user.email}, ${hashedPassword}, ${user.role}, ${user.name})
+        VALUES (${normalizedEmail}, ${hashedPassword}, ${user.role}, ${user.name})
         ON CONFLICT (email) DO UPDATE 
         SET role = ${user.role}, name = ${user.name};
       `; // Upsert to update roles if they change
-      console.log(`Seeded user: ${user.email}`);
+      console.log(`Seeded user: ${normalizedEmail}`);
     }
 
   } catch (error) {
